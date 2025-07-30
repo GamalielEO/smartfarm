@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Smart Farm Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/styles/styles.css">
+</head>
+<body>
+  <div class="container-fluid">
+    <nav class="navbar bg-success">
+      <div class="container">
+        <span class="navbar-brand text-white">🌱 Smart Agriculture System</span>
+        <div class="d-flex gap-2">
+          <form action="/add-device" method="POST" class="d-flex gap-2">
+            <input type="text" name="name" placeholder="Device Name" class="form-control" required>
+            <input type="text" name="location" placeholder="Location" class="form-control">
+            <button type="submit" class="btn btn-light" <%= (devices && devices.length >= 5) ? 'disabled' : '' %>>Add Device</button>
+          </form>
+        </div>
+      </div>
+    </nav>
+
+    <% if (devices && devices.length >= 5) { %>
+      <div class="alert alert-warning mt-3">
+        Maximum of 5 devices reached. Cannot add more devices.
+      </div>
+    <% } %>
+
+    <div class="glass-card my-4">
+      <form action="/add-plant" method="POST" class="row g-3 align-items-center">
+        <div class="col-md-4">
+          <select name="deviceId" class="form-select" required>
+            <option value="">Select Device</option>
+            <% (devices || []).forEach(device => { %>
+              <option value="<%= device.id %>">
+                <%= device.name %> (<%= device.location %>) - Pins v<%= device.pinRange.start %> to v<%= device.pinRange.end %>
+              </option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <select name="plantType" class="form-select" required>
+            <option value="">Select Plant</option>
+            <option value="Cassava">Cassava</option>
+            <option value="Melon">Melon</option>
+            <option value="Maze">Maize</option>
+            <option value="Palm">Palm</option>
+            <option value="ScentLeaf">Scent Leaf</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <button type="submit" class="btn btn-success w-100">Add Plant</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+      <% (devices || []).forEach(device => { %>
+        <% const devicePlants = (plants || []).filter(p => p.deviceId === device.id); %>
+        <% devicePlants.forEach(plant => { %>
+          <div class="col">
+            <div class="plant-card status-<%= helpers.getStatus(plant.stats.temperature, 18, 35) %>">
+              <div class="card-header d-flex justify-content-between">
+                <h5><%= plant.type %></h5>
+                <div>
+                  <span class="badge bg-primary"><%= device.name %></span>
+                  <span class="badge bg-secondary"><%= device.location %></span>
+                  <div class="device-pin-info">Pins: v<%= device.pinRange.start %>-v<%= device.pinRange.end %></div>
+                </div>
+              </div>
+              <div class="card-body">
+                <% if (plant.stats) { %>
+                  <div class="sensor-grid">
+                    <div class="sensor-item <%= helpers.getStatus(plant.stats.temperature, 18, 35) %>">
+                      <div class="sensor-value">🌡️ <%= plant.stats.temperature %>°C</div>
+                      <div class="sensor-label">Temperature (v<%= device.pinRange.start + 2 %>)</div>
+                    </div>
+                    <div class="sensor-item <%= helpers.getStatus(plant.stats.humidity, 40, 90) %>">
+                      <div class="sensor-value">💧 <%= plant.stats.humidity %>%</div>
+                      <div class="sensor-label">Humidity (v<%= device.pinRange.start + 3 %>)</div>
+                    </div>
+                    <div class="sensor-item <%= helpers.getStatus(plant.stats.soilMoisture, 30, 80) %>">
+                      <div class="sensor-value">🌱 <%= plant.stats.soilMoisture %>%</div>
+                      <div class="sensor-label">Soil Moisture (v<%= device.pinRange.start + 1 %>)</div>
+                    </div>
+                    <div class="sensor-item <%= helpers.getStatus(plant.stats.lightLevel, 3000, 15000) %>">
+                      <div class="sensor-value">💡 <%= plant.stats.lightLevel %> lux</div>
+                      <div class="sensor-label">Light Level (v<%= device.pinRange.start + 4 %>)</div>
+                    </div>
+                  </div>
+                <% } %>
+                
+                <div class="recommendations mt-3">
+                  <h6>🌿 AI Recommendations</h6>
+                  <ul class="list-unstyled">
+                    <% (plant.recommendations || []).forEach(recommendation => { %>
+                      <li>✅ <%= recommendation %></li>
+                    <% }) %>
+                  </ul>
+                </div>
+
+                <div class="text-muted small mt-2">
+                  <% if (plant.stats) { %>
+                    Last updated: <%= plant.stats.lastUpdated %>
+                  <% } %>
+                  <br>Device ID: <%= device.id %>
+                </div>
+              </div>
+            </div>
+          </div>
+        <% }) %>
+      <% }) %>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- WebSocket client for real-time updates -->
+  <script>
+    const socket = new WebSocket(`ws://${location.host}`);
+    socket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "update") {
+          // Simple strategy: reload page to reflect latest stats
+          location.reload();
+        }
+      } catch (e) {
+        console.error("WS message parse error", e);
+      }
+    };
+  </script>
+</body>
+</html>
